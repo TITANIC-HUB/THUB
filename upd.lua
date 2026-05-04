@@ -426,7 +426,7 @@ function AutoFarm:Start()
 								if not napePart or not napePos then task.wait() continue end
 
 								-- Multi-hit: S_Explode x5 + Register per frame (no freeze)
-								for i = 1, 7 do
+								for i = 1, 5 do
 									postRemote:FireServer("Spears", "S_Explode", napePos)
 								end
 								postRemote:FireServer("Hitboxes", "Register", napePart, math.random(625, 850))
@@ -1034,10 +1034,18 @@ local Missions = {
 
 -- Raid objective names (server-side exact strings from remote spy)
 local RaidObjectives = {
-	["Trost"]      = "Attack Titan",
+	["Trost"]       = "Attack Titan",
 	["Shiganshina"] = "Armored Titan",
-	["Stohess"]    = "Female Titan",
-	["Colossal"]   = "Colossal Titan",
+	["Stohess"]     = "Female Titan",
+	["Colossal"]    = "Colossal Titan",
+}
+
+-- Actual map name sent to server (Colossal uses Shiganshina map!)
+local RaidMapNames = {
+	["Trost"]       = "Trost",
+	["Shiganshina"] = "Shiganshina",
+	["Stohess"]     = "Stohess",
+	["Colossal"]    = "Shiganshina",
 }
 
 local SkillPaths = {
@@ -1699,6 +1707,8 @@ Toggles.AutoStartToggle:OnChanged(function()
 					mapName = Options.RaidMapDropdown.Value
 					-- Use exact server-side objective name for raids
 					objective = RaidObjectives[mapName] or Options.RaidObjectiveDropdown.Value
+					-- Colossal uses Shiganshina map server-side
+					mapName = RaidMapNames[mapName] or mapName
 				end
 
 				local created = false
