@@ -130,6 +130,16 @@ end
 local AutoFarm = {}
 AutoFarm._running = false
 
+-- Auto restart AutoFarm when character respawns (after retry teleport)
+lp.CharacterAdded:Connect(function()
+	task.wait(3) -- wait for map to load
+	if Toggles and Toggles.AutoKillToggle and Toggles.AutoKillToggle.Value then
+		AutoFarm:Stop()
+		task.wait(0.5)
+		AutoFarm:Start()
+	end
+end)
+
 getgenv().AutoFarmConfig = {
 	AttackCooldown = 1,
 	ReloadCooldown = 1,
@@ -426,7 +436,7 @@ function AutoFarm:Start()
 								if not napePart or not napePos then task.wait() continue end
 
 								-- Multi-hit: S_Explode x5 + Register per frame (no freeze)
-								for i = 1, 5 do
+								for i = 1, 7 do
 									postRemote:FireServer("Spears", "S_Explode", napePos)
 								end
 								postRemote:FireServer("Hitboxes", "Register", napePart, math.random(625, 850))
@@ -526,10 +536,11 @@ function AutoFarm:Start()
 				if isArmoredRaid and not hasReinerObjective and tName == "Armored_Titan" then continue end
 
 				-- Colossal Phase 1: Don't attack Colossal nape with blades/spears (cannon handles it)
+				-- Colossal Phase 2: Phase2 spawn loop handles Colossal → main loop kills regular titans only
 				if isColossalRaid then
 					local stallObjective = rs_ObjectiveFolder:FindFirstChild("Stall_Colossal_Titan")
 					local stallDone = stallObjective and stallObjective.Value >= (stallObjective:GetAttribute("Requirement") or 1)
-					if not stallDone and tName == "Colossal_Titan" then continue end
+					if tName == "Colossal_Titan" then continue end -- always skip: cannon/phase2 loop handles it
 				end
 		
 				if isBoss and not titanModel:GetAttribute("State") then continue end
@@ -1117,7 +1128,7 @@ local function setupAutoExecute()
 		queue_on_teleport([[
 			repeat task.wait() until game:IsLoaded()
 			task.wait(5)
-			loadstring(game:HttpGet("https://raw.githubusercontent.com/inkwellblogs/UsSuite/main/j.lua"))()
+			loadstring(game:HttpGet("https://raw.githubusercontent.com/TITANIC-HUB/THUB/main/upd.lua"))()
 		]])
 	end
 end
