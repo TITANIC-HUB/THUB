@@ -1995,15 +1995,19 @@ Toggles.AutoUpgradeToggle:OnChanged(function()
 
 			while getgenv().AutoUpgrade do
 				local slotIndex = lp:GetAttribute("Slot")
-				if not slotIndex or not plrData.Slots[slotIndex] then task.wait(1) continue end
-				local weapon = plrData.Slots[slotIndex].Weapon
-				local upgrades = plrData.Slots[slotIndex].Upgrades[weapon]
+				local liveData = getRemote:InvokeServer("Data", "Copy")
+				if not slotIndex or not liveData or not liveData.Slots or not liveData.Slots[slotIndex] then task.wait(1) continue end
+
+				local weapon = liveData.Slots[slotIndex].Weapon
+				local upgrades = liveData.Slots[slotIndex].Upgrades and liveData.Slots[slotIndex].Upgrades[weapon]
+				if not upgrades then task.wait(1) continue end
 
 				for upg, lvl in next, upgrades do
-					if getRemote:InvokeServer("S_Equipment", "Upgrade", upg) then
+					-- Server expects table: {"Blade_Durability"} not just "Blade_Durability"
+					if getRemote:InvokeServer("S_Equipment", "Upgrade", {upg}) then
 						Library:Notify({
 							Title = "Upgraded " .. string.gsub(upg, "_", " "),
-							Description = "Level " .. tostring(lvl),
+							Description = "Level " .. tostring(lvl + 1),
 							Time = 1.5
 						})
 						task.wait(0.3)
