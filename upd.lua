@@ -436,7 +436,7 @@ function AutoFarm:Start()
 								if not napePart or not napePos then task.wait() continue end
 
 								-- Multi-hit: S_Explode x5 + Register per frame (no freeze)
-								for i = 1, 7 do
+								for i = 1, 5 do
 									postRemote:FireServer("Spears", "S_Explode", napePos)
 								end
 								postRemote:FireServer("Hitboxes", "Register", napePart, math.random(625, 850))
@@ -1128,7 +1128,7 @@ local function setupAutoExecute()
 		queue_on_teleport([[
 			repeat task.wait() until game:IsLoaded()
 			task.wait(5)
-			loadstring(game:HttpGet("https://raw.githubusercontent.com/TITANIC-HUB/THUB/main/upd.lua"))()
+			loadstring(game:HttpGet("https://raw.githubusercontent.com/inkwellblogs/UsSuite/main/j.lua"))()
 		]])
 	end
 end
@@ -1290,14 +1290,20 @@ local function getRefillPart()
 		end
 	end
 
-	-- Path 2: Unclimbable.Props.HQ.GasTanks.Refill (most maps)(this is real path)
+	-- Path 2: Unclimbable.Props.HQ.[anyChild].Refill (log confirmed: HQ:GetChildren()[342].Refill)
 	local props = unclimbable:FindFirstChild("Props")
 	if props then
 		local hq = props:FindFirstChild("HQ")
 		if hq then
+			-- Check GasTanks first (fast path)
 			local gasTank = hq:FindFirstChild("GasTanks")
 			if gasTank then
 				local refill = gasTank:FindFirstChild("Refill")
+				if refill then return refill end
+			end
+			-- Search ALL children of HQ (log shows it's at index 342, not always GasTanks)
+			for _, child in ipairs(hq:GetChildren()) do
+				local refill = child:FindFirstChild("Refill")
 				if refill then return refill end
 			end
 		end
@@ -1305,6 +1311,18 @@ local function getRefillPart()
 
 	-- Path 3: Deep search anywhere under Unclimbable (fallback)
 	return unclimbable:FindFirstChild("Refill", true)
+end
+
+-- Wait for refill part to appear (it temporarily disappears and respawns)
+local function waitForRefillPart(timeout)
+	timeout = timeout or 8
+	local t0 = os.clock()
+	local refill = getRefillPart()
+	while not refill and (os.clock() - t0) < timeout do
+		task.wait(0.5)
+		refill = getRefillPart()
+	end
+	return refill
 end
 
 local function getWeaponType()
@@ -1338,23 +1356,28 @@ local function handleWeaponReload()
 	local weaponType = getWeaponType()
 	if not weaponType then return end
 
-	local refillPart = getRefillPart()
-
 	if weaponType == "Blades" then
 		local current = getBladeCount() or 0
 
 		-- 1. Refill reserves from GasTank (if reserves = 0)
 		-- 1. Refill reserves from GasTank (if reserves = 0)
-if current == 0 and autoRefillEnabled and refillPart then
+if current == 0 and autoRefillEnabled then
     isReloading = true
     lastReloadTime = os.clock()
-    
-    -- Agar refill se door hai toh teleport karo
+
+    -- Wait for refill part if temporarily missing (respawn delay)
+    local refillPart = waitForRefillPart(8)
+    if not refillPart then
+        isReloading = false
+        return
+    end
+
+    -- TP to refill if too far
     local root = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
     if root and (root.Position - refillPart.Position).Magnitude > 50 then
         root.CFrame = refillPart.CFrame * CFrame.new(0, 5, 10)
     end
-    
+
     pcall(function() postRemote:FireServer("Attacks", "Reload", refillPart) end)
     task.delay(1.5, function() isReloading = false end)
     return
@@ -1380,19 +1403,24 @@ end
 		if not spearsLabel then return end
 
 		local spearCount = tonumber(spearsLabel.Text:match("(%d+)")) or 0
-		if spearCount == 0 and autoRefillEnabled and refillPart then
-    isReloading = true
-    lastReloadTime = os.clock()
-    
-    -- Agar refill se door hai toh teleport karo
-    local root = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
-    if root and (root.Position - refillPart.Position).Magnitude > 50 then
-        root.CFrame = refillPart.CFrame * CFrame.new(0, 5, 10)
-    end
-    
-    pcall(function() postRemote:FireServer("Attacks", "Reload", refillPart) end)
-    task.delay(1.5, function() isReloading = false end)
-end
+		if spearCount == 0 and autoRefillEnabled then
+			isReloading = true
+			lastReloadTime = os.clock()
+
+			local refillPart = waitForRefillPart(8)
+			if not refillPart then
+				isReloading = false
+				return
+			end
+
+			local root = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+			if root and (root.Position - refillPart.Position).Magnitude > 50 then
+				root.CFrame = refillPart.CFrame * CFrame.new(0, 5, 10)
+			end
+
+			pcall(function() postRemote:FireServer("Attacks", "Reload", refillPart) end)
+			task.delay(1.5, function() isReloading = false end)
+		end
 	end
 end
 
